@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>美股日报</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@300;400;500&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0c0f;--bg2:#111418;--bg3:#181c22;
+    --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+    --text:#e8eaed;--text2:#8b9099;--text3:#4a5060;
+    --up:#00c896;--down:#ff5252;--accent:#4f9eff;--gold:#f0b429;
+    --vA:#00c896;--vB:#ff5252;--vC:#f0b429;--vD:#4a5060;
+    --mono:'JetBrains Mono',monospace;
+    --sans:'Noto Sans TC',sans-serif;
+    --serif:'Playfair Display',serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;min-height:100vh}
+
+  header{border-bottom:1px solid var(--border);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(10,12,15,.96);backdrop-filter:blur(12px);z-index:100}
+  .logo{font-family:var(--serif);font-size:20px}.logo span{color:var(--gold)}
+  .hdr-r{display:flex;align-items:center;gap:12px}
+  .upd{font-family:var(--mono);font-size:10px;color:var(--text3)}
+  .btn{font-family:var(--mono);font-size:11px;cursor:pointer;border-radius:4px;padding:5px 14px;transition:all .2s;border:1px solid var(--border2);background:transparent;color:var(--text2)}
+  .btn:hover{background:var(--bg3);color:var(--text)}
+  .btn.pri{background:var(--accent);color:#fff;border-color:transparent}
+  .btn.pri:hover{opacity:.85}
+  .btn:disabled{opacity:.4;pointer-events:none}
+
+  .main{padding:24px 28px;max-width:1440px;margin:0 auto}
+  .sec{margin-bottom:36px}
+  .sec-title{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--text3);text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+  .ldot{display:inline-block;width:6px;height:6px;background:var(--up);border-radius:50%;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .sp{display:inline-block;width:11px;height:11px;border:1.5px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
+
+  /* CONFIG BAR */
+  .cfg-bar{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .cfg-lbl{font-family:var(--mono);font-size:11px;color:var(--text3);white-space:nowrap}
+  .cfg-in{flex:1;min-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 10px;outline:none;transition:border-color .2s}
+  .cfg-in:focus{border-color:var(--accent)}
+
+  /* QUOTES */
+  .q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .q-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 14px 12px;position:relative;overflow:hidden;transition:border-color .2s,transform .15s}
+  .q-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+  .q-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ac,transparent)}
+  .q-card.up{--ac:var(--up)}.q-card.down{--ac:var(--down)}
+  .q-sym{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text2);letter-spacing:.05em}
+  .q-price{font-family:var(--mono);font-size:22px;margin:5px 0 3px;color:var(--text)}
+  .q-chg{font-family:var(--mono);font-size:12px;font-weight:500}
+  .q-chg.up{color:var(--up)}.q-chg.down{color:var(--down)}
+  .q-hl{display:flex;gap:10px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--text3)}
+  .q-hl span{color:var(--text2)}
+  .q-err{font-family:var(--mono);font-size:11px;color:var(--down);margin-top:6px}
+
+  /* ANALYSIS */
+  .a-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px}
+  .a-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .a-hdr{padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+  .a-av{width:34px;height:34px;border-radius:50%;background:var(--bg3);flex-shrink:0;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text3)}
+  .a-name{font-size:13px;font-weight:500}
+  .a-sub{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:1px}
+  .a-body{padding:14px 16px}
+  .a-vtags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .a-vtag{font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:3px 8px;display:flex;align-items:center;gap:5px}
+  .a-vtag a{color:var(--text2);text-decoration:none}.a-vtag a:hover{color:var(--accent)}
+  .cdot{width:5px;height:5px;border-radius:50%;background:var(--up);display:inline-block}
+  .ncdot{width:5px;height:5px;border-radius:50%;background:var(--text3);display:inline-block}
+  .a-slbl{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin:14px 0 6px;padding:4px 8px;background:rgba(79,158,255,0.08);border-left:2px solid var(--accent);border-radius:0 3px 3px 0}
+  .a-slbl:first-child{margin-top:4px}
+  .a-txt{font-size:12px;color:var(--text2);line-height:1.75;white-space:pre-wrap}
+  .a-vpills{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .a-vp{font-family:var(--mono);font-size:10px;border-radius:4px;padding:2px 8px;display:flex;align-items:center;gap:4px}
+  .a-vp.A{background:rgba(0,200,150,.12);color:var(--vA);border:1px solid rgba(0,200,150,.25)}
+  .a-vp.B{background:rgba(255,82,82,.12);color:var(--vB);border:1px solid rgba(255,82,82,.25)}
+  .a-vp.C{background:rgba(240,180,41,.12);color:var(--vC);border:1px solid rgba(240,180,41,.25)}
+  .a-novid{font-family:var(--mono);font-size:11px;color:var(--text3);padding:8px 0}
+  .a-err{padding:12px 16px;font-family:var(--mono);font-size:11px;color:var(--down)}
+  .a-ld{padding:20px 16px;font-family:var(--mono);font-size:11px;color:var(--text3)}
+
+  /* VOTE TABLE */
+  .vtbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+  .vtbl th{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);font-weight:400;padding:6px 14px;text-align:left;border-bottom:1px solid var(--border)}
+  .vtbl td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .vtbl tr:last-child td{border-bottom:none}
+  .vtbl tr:hover td{background:var(--bg3)}
+  .vsym{font-weight:500;color:var(--text);letter-spacing:.04em}
+  .vpill{font-size:11px;border-radius:4px;padding:2px 10px;min-width:36px;text-align:center;display:inline-block}
+  .vpill.A{background:rgba(0,200,150,.15);color:var(--vA)}
+  .vpill.B{background:rgba(255,82,82,.15);color:var(--vB)}
+  .vpill.C{background:rgba(240,180,41,.15);color:var(--vC)}
+  .vpill.D{background:rgba(74,80,96,.12);color:var(--vD)}
+  .vverdict{font-size:11px;font-weight:500;padding:2px 10px;border-radius:4px;display:inline-block}
+  .vverdict.A{background:rgba(0,200,150,.18);color:var(--vA)}
+  .vverdict.B{background:rgba(255,82,82,.18);color:var(--vB)}
+  .vverdict.C{background:rgba(240,180,41,.18);color:var(--vC)}
+  .vverdict.D{background:rgba(74,80,96,.15);color:var(--vD)}
+
+  footer{border-top:1px solid var(--border);padding:14px 28px;font-family:var(--mono);font-size:10px;color:var(--text3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  @media(max-width:640px){header{padding:12px 14px}.main{padding:14px}.q-grid{grid-template-columns:repeat(2,1fr)}.a-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">美股财经<span>日报</span> <span style="font-size:13px;color:var(--text3);font-family:var(--mono);font-weight:400">v1.3</span></div>
+  <div class="hdr-r">
+    <span class="upd" id="updTime">未更新</span>
+    <button class="btn pri" id="refreshBtn" onclick="loadAll()">↻ 更新</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <div class="cfg-bar">
+    <span class="cfg-lbl">Worker 地址</span>
+    <input class="cfg-in" id="workerUrl" placeholder="https://stock-daily.yourname.workers.dev">
+    <button class="btn" onclick="saveWorker()">保存</button>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><span class="ldot"></span>实时行情</div>
+    <div class="q-grid" id="quoteGrid"><div style="color:var(--text3);font-family:var(--mono);font-size:11px"><span class="sp"></span> 点击更新...</div></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">博主观点分析</div>
+    <div class="a-grid" id="analysisGrid"><div style="color:var(--text3);font-family:var(--mono);font-size:11px">点击更新...</div></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">标的投票委员会</div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">
+      <table class="vtbl" id="voteTable">
+        <thead id="voteThead">
+          <tr><th>标的</th><th>综合结论</th></tr>
+        </thead>
+        <tbody id="voteTbody"><tr><td colspan="2" style="text-align:center;color:var(--text3);font-family:var(--mono);font-size:11px;padding:20px">点击更新...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span>数据来源：Finnhub · YouTube Data API v3 · OpenAI</span>
+  <span>仅供参考，不构成投资建议</span>
+</footer>
+
+<script>
+const SYMBOLS=['QQQ','SPY','YINN','VXX','SVIX','SOXL','MSFT','NVDA','UGL','META'];
+const SYM_DISPLAY={'QQQ':'QQQ (.NDX)','SPY':'SPY (.SPX)'};
+const VL={A:'看涨',B:'看跌',C:'观望',D:'未提及'};
+function symLabel(s){return SYM_DISPLAY[s]||s;}
+// 博主列表（与第二模块保持一致，由API返回动态更新）
+let BLOGGERS = [];
+
+function getWorker(){return localStorage.getItem('workerUrl')||'';}
+function saveWorker(){
+  const v=document.getElementById('workerUrl').value.trim().replace(/\/$/,'');
+  if(v){localStorage.setItem('workerUrl',v);alert('已保存');}
+}
+window.onload=()=>{
+  const s=getWorker();
+  if(s)document.getElementById('workerUrl').value=s;
+};
+
+async function loadAll(){
+  const w=getWorker();
+  if(!w){alert('请先填写 Worker 地址并保存');return;}
+  const btn=document.getElementById('refreshBtn');
+  btn.disabled=true;btn.textContent='更新中...';
+  document.getElementById('updTime').textContent=new Date().toLocaleString('zh-CN',{hour12:false});
+  await Promise.all([loadQuotes(w),loadAnalysis(w)]);
+  btn.disabled=false;btn.textContent='↻ 更新';
+}
+
+/* ── QUOTES ── */
+async function loadQuotes(w){
+  const g=document.getElementById('quoteGrid');
+  g.innerHTML='<div style="color:var(--text3);font-family:var(--mono);font-size:11px"><span class="sp"></span> 加载行情...</div>';
+  try{
+    const r=await fetch(w+'/api/quotes');
+    const d=await r.json();
+    if(d.error)throw new Error(d.error);
+    g.innerHTML=d.map(qCard).join('');
+  }catch(e){g.innerHTML=`<div style="color:var(--down);font-family:var(--mono);font-size:11px">行情失败：${e.message}</div>`;}
+}
+function f(n,d=2){return(n!=null&&!isNaN(n))?Number(n).toFixed(d):'--';}
+function fp(n){return(n!=null&&!isNaN(n))?(n>=0?'+':'')+Number(n).toFixed(2)+'%':'--';}
+function qCard(q){
+  if(!q.ok)return`<div class="q-card"><div class="q-sym">${symLabel(q.symbol)}</div><div class="q-err">无数据</div></div>`;
+  const u=q.change>=0,c=u?'up':'down',a=u?'▲':'▼';
+  return`<div class="q-card ${c}">
+    <div class="q-sym">${symLabel(q.symbol)}</div>
+    <div class="q-price">$${f(q.price)}</div>
+    <div class="q-chg ${c}">${a} ${f(Math.abs(q.change))} ${fp(q.changePct)}</div>
+    <div class="q-hl"><div>H <span>$${f(q.high)}</span></div><div>L <span>$${f(q.low)}</span></div></div>
+  </div>`;
+}
+
+/* ── ANALYSIS ── */
+const SUPADATA_KEY = 'sd_349fd0179c98859968af2d553a630e26';
+
+async function fetchCaption(videoId) {
+  try {
+    const url = 'https://api.supadata.ai/v1/youtube/transcript?url='
+      + encodeURIComponent('https://www.youtube.com/watch?v=' + videoId) + '&text=true';
+    const r = await fetch(url, { headers: { 'x-api-key': SUPADATA_KEY } });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const raw = typeof d.content === 'string' ? d.content
+      : Array.isArray(d.content) ? d.content.map(t => t.text).join(' ') : null;
+    return raw || null;
+  } catch { return null; }
+}
+
+function cleanCaptionClient(raw) {
+  const adWords = ['moomoo','富途','老虎证券','盈透','tastytrade','webull',
+    '开户','入金','佣金','手续费','领取','奖励','礼卡','亚马逊','年化利息',
+    '现金奖励','置顶评论','描述栏','subscribe','订阅','点赞','关注频道'];
+
+  // 检测是否是每字加空格的格式（ASR字幕），如果是则先合并
+  const spaceRatio = (raw.match(/ /g)||[]).length / raw.length;
+  let text = raw;
+  if (spaceRatio > 0.3) {
+    text = raw.replace(/ /g, '');
+  }
+
+  // 过滤广告行
+  const lines = text.split('。').map(s=>s.trim()).filter(s=>s.length>2)
+    .filter(l=>!adWords.some(w=>l.includes(w)));
+
+  const deduped=[];
+  for(const l of lines){
+    const last=deduped[deduped.length-1]||'';
+    if(last&&(last.includes(l)||l.includes(last)||(l.length>10&&last.slice(0,12)===l.slice(0,12))))continue;
+    deduped.push(l);
+  }
+
+  const result = deduped.join('。').slice(0,6000);
+  // 兜底：如果清洗后内容太少（<100字），直接用原始文本
+  if (result.length < 100) {
+    return text.slice(0, 6000);
+  }
+  return result;
+}
+
+function buildVotesClient(channels) {
+  const tally={};
+  for(const sym of SYMBOLS) tally[sym]={A:0,B:0,C:0,D:0};
+  for(const ch of channels){
+    // 无视频或无字幕的博主，所有标的强制记 D
+    const hasAnalysis = ch.analysis && ch.analysis.votes && !ch.analysis.noVideo && !ch.analysis.noCaption;
+    const v = hasAnalysis ? ch.analysis.votes : {};
+    for(const sym of SYMBOLS){
+      const raw = v[sym];
+      // AI 只有明确输出 A/B/C 才采用，否则一律 D
+      const vote = ['A','B','C'].includes((raw||'').toUpperCase()) ? raw.toUpperCase() : 'D';
+      tally[sym][vote]++;
+    }
+  }
+  return tally;
+}
+
+function aCardSkeleton(ch, status) {
+  const name=ch.channelName||ch.handle;
+  const av=ch.avatar
+    ?'<img class="a-av" src="'+ch.avatar+'" alt="'+name+'">'
+    :'<div class="a-av">'+(name[0]||'?')+'</div>';
+  const sub=status||((!ch.videos||ch.videos.length===0)?'今日暂无视频':'获取中...');
+  return '<div class="a-hdr">'+av+'<div><div class="a-name">'+name+'</div><div class="a-sub">'+sub+'</div></div></div>';
+}
+
+async function loadAnalysis(w){
+  const g=document.getElementById('analysisGrid');
+  const tb=document.getElementById('voteTbody');
+  g.innerHTML='<div style="color:var(--text3);font-family:var(--mono);font-size:11px"><span class="sp"></span> 获取今日视频列表...</div>';
+  tb.innerHTML='<tr><td colspan="2" style="text-align:center;color:var(--text3);font-family:var(--mono);font-size:11px;padding:20px">等待分析...</td></tr>';
+
+  try{
+    // 1. 从 Worker 获取视频列表（不做 AI 分析）
+    const r=await fetch(w+'/api/analysis');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    if(!d.channels)throw new Error('数据格式错误');
+    const channels=d.channels;
+
+    // 2. 先渲染框架
+    g.innerHTML=channels.map(ch=>'<div class="a-card" id="ch-'+(ch.channelId||ch.handle).replace(/[^a-zA-Z0-9]/g,'_')+'">'+aCardSkeleton(ch)+'</div>').join('');
+
+    // 3. 逐个频道处理
+    const allResults=[];
+    for(const ch of channels){
+      const cid=(ch.channelId||ch.handle).replace(/[^a-zA-Z0-9]/g,'_');
+      const el=document.getElementById('ch-'+cid);
+
+      if(!ch.videos||ch.videos.length===0){
+        if(el)el.innerHTML=aCard({...ch,analysis:null});
+        allResults.push({...ch,analysis:null});
+        continue;
+      }
+
+      // 浏览器抓字幕
+      if(el)el.innerHTML=aCardSkeleton(ch,'字幕抓取中...');
+      const vids=[];
+      for(const v of ch.videos.slice(0,3)){
+        const raw=await fetchCaption(v.videoId);
+        const caption=raw?cleanCaptionClient(raw):null;
+        vids.push({...v,caption,hasCaption:!!caption});
+      }
+
+      if(!vids.some(v=>v.hasCaption)){
+        const result={...ch,videos:vids,analysis:{noCaption:true}};
+        if(el)el.innerHTML=aCard(result);
+        allResults.push(result);
+        continue;
+      }
+
+      // AI 分析
+      if(el)el.innerHTML=aCardSkeleton(ch,'AI 分析中...');
+      try{
+        const ar=await fetch(w+'/api/analyze',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({channelId:ch.channelId||ch.handle,displayName:ch.channelName,videos:vids})
+        });
+        const ad=await ar.json();
+        const result={...ch,videos:vids,analysis:ad.analysis||{noCaption:true}};
+        if(el)el.innerHTML=aCard(result);
+        allResults.push(result);
+      }catch{
+        const result={...ch,videos:vids,analysis:null,error:'AI分析失败'};
+        if(el)el.innerHTML=aCard(result);
+        allResults.push(result);
+      }
+    }
+
+    // 4. 投票表格
+    BLOGGERS=allResults.map(ch=>ch.channelName||ch.handle);
+    renderVoteTable(allResults,buildVotesClient(allResults));
+
+  }catch(e){
+    g.innerHTML='<div style="color:var(--down);font-family:var(--mono);font-size:11px">失败：'+e.message+'</div>';
+  }
+}
+function ago(iso){
+  if(!iso)return'';
+  const d=(Date.now()-new Date(iso))/1000;
+  if(d<3600)return Math.floor(d/60)+'分钟前';
+  if(d<86400)return Math.floor(d/3600)+'小时前';
+  return Math.floor(d/86400)+'天前';
+}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function parseSummary(txt){
+  const r={events:'',market:'',stocks:''};
+  if(!txt)return r;
+  let cur='';
+  for(const l of txt.split('\n')){
+    if(/^0[.、．]/.test(l)){cur='';continue;}
+    if(/^1[.、．]|事件|重大|财经事件/i.test(l)){cur='events';continue;}
+    if(/^2[.、．]|大盘|大类|市场/i.test(l)){cur='market';continue;}
+    if(/^3[.、．]|个股/i.test(l)){cur='stocks';continue;}
+    if(/^4[.、．]|投票|json/i.test(l)){cur='';continue;}
+    if(l.includes('```')){cur='';continue;}
+    if(cur&&l.trim())r[cur]+=l+'\n';
+  }
+  return r;
+}
+function aCard(ch){
+  const name=ch.channelName||ch.handle;
+  const vcnt=(ch.videos||[]).length;
+  const av=ch.avatar
+    ?`<img class="a-av" src="${ch.avatar}" alt="${name}">`
+    :`<div class="a-av">${name[0]}</div>`;
+
+  // 视频来源链接（小字，放在header副标题）
+  const vlinks=(ch.videos||[]).map(v=>
+    `<a href="https://www.youtube.com/watch?v=${v.videoId}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:10px;font-family:var(--mono)">${v.title.slice(0,20)}${v.title.length>20?'…':''}</a>`
+  ).join('<span style="color:var(--text3);margin:0 4px">·</span>');
+
+  if(ch.error)return`<div class="a-card">
+    <div class="a-hdr">${av}<div><div class="a-name">${name}</div></div></div>
+    <div class="a-err">加载失败：${ch.error}</div>
+  </div>`;
+
+  if(!ch.analysis||ch.analysis.noVideo)return`<div class="a-card">
+    <div class="a-hdr">${av}<div><div class="a-name">${name}</div><div class="a-sub">今日暂无视频</div></div></div>
+  </div>`;
+  if(ch.analysis&&ch.analysis.noCaption)return`<div class="a-card">
+    <div class="a-hdr">${av}<div><div class="a-name">${name}</div><div class="a-sub" style="color:var(--text3)">视频无字幕，跳过分析</div></div></div>
+  </div>`;
+
+  const{summary='',briefSummary='',votes={}}=ch.analysis;
+  const s=parseSummary(summary);
+  const pills=Object.entries(votes).filter(([,v])=>v!=='D').map(([sym,v])=>`<div class="a-vp ${v}">${symLabel(sym)} ${VL[v]}</div>`).join('');
+
+  return`<div class="a-card">
+    <div class="a-hdr">
+      ${av}
+      <div style="flex:1;min-width:0">
+        <div class="a-name">${name}</div>
+        ${vcnt?`<div class="a-sub" style="margin-top:3px;line-height:1.5">${vlinks}</div>`:''}
+      </div>
+    </div>
+    <div class="a-body">
+      ${briefSummary?`<div class="a-slbl">今日总结</div><div class="a-txt" style="background:var(--bg3);border-radius:6px;padding:10px 12px;border-left:2px solid var(--accent)">${esc(briefSummary)}</div>`:''}
+      ${s.events?`<div class="a-slbl">今日重大财经事件</div><div class="a-txt">${esc(s.events.trim())}</div>`:''}
+      ${s.market?`<div class="a-slbl">大盘与大类资产</div><div class="a-txt">${esc(s.market.trim())}</div>`:''}
+      ${s.stocks?`<div class="a-slbl">个股分析</div><div class="a-txt">${esc(s.stocks.trim())}</div>`:''}
+      ${pills?`<div class="a-slbl">标的观点</div><div class="a-vpills">${pills}</div>`:''}
+      ${!briefSummary&&!s.events&&!s.market&&!s.stocks?`<div class="a-novid" style="color:var(--text3);font-family:var(--mono);font-size:11px">分析内容为空</div>`:''}
+    </div>
+  </div>`;
+}
+
+/* ── VOTE TABLE ── */
+function renderVoteTable(channels, votes) {
+  const thead = document.getElementById('voteThead');
+  const tbody = document.getElementById('voteTbody');
+  if (!channels || !votes) return;
+
+  const bloggers = channels.map(ch => ({ name: ch.channelName || ch.handle, handle: ch.handle }));
+
+  // 构建表头：标的 | 博主1 | 博主2 | ... | 综合结论
+  thead.innerHTML = '<tr>' +
+    '<th>标的</th>' +
+    bloggers.map(b => `<th style="font-size:9px;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis" title="${b.name}">${b.name.slice(0,6)}${b.name.length>6?'…':''}</th>`).join('') +
+    '<th>综合</th>' +
+  '</tr>';
+
+  // 构建每行：每个标的 × 每个博主的投票
+  tbody.innerHTML = SYMBOLS.map(sym => {
+    // 从每个博主的 analysis.votes 里取该标的的投票
+    const bloggerVotes = channels.map(ch => {
+      const hasAnalysis = ch.analysis && ch.analysis.votes && !ch.analysis.noVideo && !ch.analysis.noCaption;
+      const raw = hasAnalysis ? ch.analysis.votes[sym] : null;
+      // 只接受明确的 A/B/C，其余一律 D
+      const v = ['A','B','C'].includes((raw||'').toUpperCase()) ? raw.toUpperCase() : 'D';
+      return v.toUpperCase();
+    });
+
+    // 汇总计票
+    const tally = {A:0,B:0,C:0,D:0};
+    bloggerVotes.forEach(v => { if(tally[v]!==undefined) tally[v]++; });
+
+    // 综合结论：排除D后取最多票
+    const nonD = ['A','B','C'].reduce((a,b) => tally[a]>=tally[b]?a:b);
+    const verdict = tally[nonD] > 0 ? nonD : 'D';
+    const vl={A:'看涨',B:'看跌',C:'观望',D:'未定'};
+
+    const vColor = {A:'var(--vA)',B:'var(--vB)',C:'var(--vC)',D:'var(--vD)'};
+
+    return `<tr>
+      <td class="vsym">${symLabel(sym)}</td>
+      ${bloggerVotes.map(v => `<td style="text-align:center"><span class="vpill ${v}" style="min-width:24px;font-size:10px;padding:2px 6px">${v}</span></td>`).join('')}
+      <td><span class="vverdict ${verdict}">${vl[verdict]}<br><span style="font-size:9px;opacity:.7">A${tally.A}/B${tally.B}/C${tally.C}</span></span></td>
+    </tr>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
