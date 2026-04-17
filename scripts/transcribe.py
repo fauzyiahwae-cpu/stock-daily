@@ -354,11 +354,18 @@ def main():
     # 写入 YouTube cookies 文件（供 yt-dlp 使用）
     cookies_path = None
     if YOUTUBE_COOKIES_B64:
-        import base64
         cookies_path = os.path.join(tempfile.gettempdir(), 'youtube_cookies.txt')
-        with open(cookies_path, 'w') as f:
-            f.write(YOUTUBE_COOKIES_B64)
-        print(f'[cookies] 已写入: {cookies_path}')
+        # Secret 传入时换行符可能被转义为 \n，需要还原
+        cookies_content = YOUTUBE_COOKIES_B64.replace('\\n', '\n')
+        with open(cookies_path, 'w', newline='\n') as f:
+            f.write(cookies_content)
+        # 验证文件内容
+        with open(cookies_path, 'r') as f:
+            lines = f.readlines()
+        print(f'[cookies] 已写入: {cookies_path} ({len(lines)} 行)')
+        # 打印前3行验证格式（不含敏感值）
+        for line in lines[:3]:
+            print(f'[cookies] 预览: {line[:60].strip()}')
     else:
         print('[cookies] 未配置 YOUTUBE_COOKIES，yt-dlp 可能被反爬拦截')
 
