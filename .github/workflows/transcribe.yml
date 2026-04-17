@@ -1,12 +1,10 @@
-name: 无字幕视频转录
+name: 转录无字幕视频
 
 on:
   schedule:
-    # 北京时间 09:15 = UTC 01:15
-    - cron: '15 1 * * 1-5'
-    # 北京时间 21:00 = UTC 13:00
-    - cron: '0 13 * * 1-5'
-  workflow_dispatch:  # 支持手动触发
+    - cron: '15 1 * * 1-5'   # 北京时间 09:15（UTC 01:15），周一到周五
+    - cron: '0 13 * * 1-5'   # 北京时间 21:00（UTC 13:00），周一到周五
+  workflow_dispatch:           # 支持手动触发
 
 jobs:
   transcribe:
@@ -17,18 +15,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
+      - name: 安装依赖
         run: |
-          pip install yt-dlp groq requests
+          pip install --quiet yt-dlp groq requests
+          yt-dlp --version
 
-      - name: Run transcription
+      - name: 运行转录脚本
         env:
-          WORKER_URL: https://stock-daily.fauzyiahwae.workers.dev
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          WORKER_SECRET: ${{ secrets.WORKER_SECRET }}
+          WORKER_URL:           ${{ secrets.WORKER_URL }}
+          GROQ_API_KEY:         ${{ secrets.GROQ_KEY }}
+          SUPADATA_KEY:         ${{ secrets.SUPADATA_KEY }}
+          WORKER_SECRET:        ${{ secrets.WORKER_SECRET }}
+          YOUTUBE_COOKIES:      ${{ secrets.YOUTUBE_COOKIES }}
+          MAX_DURATION_MIN:     '30'
+          MAX_VIDEOS_PER_RUN:   '5'
         run: python scripts/transcribe.py
