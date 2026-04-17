@@ -242,9 +242,12 @@ def download_audio(video_id, output_dir, cookies_path=None):
         url
     ]
     # 注入 cookies（避免 YouTube 反爬）
+    print(f'  [yt-dlp] cookies_path={cookies_path}, exists={cookies_path and os.path.exists(cookies_path)}')
     if cookies_path and os.path.exists(cookies_path):
         cmd.insert(1, cookies_path)
         cmd.insert(1, '--cookies')
+        print(f'  [yt-dlp] 已注入 cookies: {cookies_path}')
+    print(f'  [yt-dlp] cmd前5项: {cmd[:5]}')
     try:
         result = subprocess.run(cmd, timeout=180, capture_output=True, text=True)
         if result.returncode != 0:
