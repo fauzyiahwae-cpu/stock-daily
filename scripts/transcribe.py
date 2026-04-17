@@ -22,6 +22,7 @@ YOUTUBE_KEY         = os.environ['YOUTUBE_KEY']
 OPENAI_KEY          = os.environ.get('GROQ_KEY') or os.environ['OPENAI_KEY']  # 优先用 GROQ_KEY
 WHISPER_URL         = os.environ.get('WHISPER_URL', 'https://api.groq.com/openai/v1/audio/transcriptions')  # Groq 免费层，兼容 OpenAI 接口
 SUPADATA_KEY        = os.environ.get('SUPADATA_KEY', '')
+YOUTUBE_COOKIES_B64 = os.environ.get('YOUTUBE_COOKIES', '')  # base64 编码的 cookies.txt 内容
 MAX_DURATION_MIN    = int(os.environ.get('MAX_DURATION_MIN', '30'))
 MAX_VIDEOS_PER_RUN  = int(os.environ.get('MAX_VIDEOS_PER_RUN', '3'))
 WHISPER_SIZE_LIMIT_MB = 24  # Whisper API 硬限制 25MB，留1MB余量
@@ -200,7 +201,7 @@ def get_video_duration(video_id):
         return -1
 
 # ── yt-dlp 下载音频 ─────────────────────────────────────────────
-def download_audio(video_id, output_dir):
+def download_audio(video_id, output_dir, cookies_path=None):
     """
     下载为 mp3，audio-quality 5（128kbps，够 Whisper 识别，文件小）。
     yt-dlp 输出文件名可能带后缀如 .webm.mp3，用 glob 查找实际文件。
@@ -216,10 +217,13 @@ def download_audio(video_id, output_dir):
         '--output', output_tmpl,
         '--quiet',
         '--no-warnings',
-        # 限速防封：下载速度上限 2MB/s
         '--limit-rate', '2M',
         url
     ]
+    # 注入 cookies（避免 YouTube 反爬）
+    if cookies_path and os.path.exists(cookies_path):
+        cmd.insert(1, cookies_path)
+        cmd.insert(1, '--cookies')
     try:
         result = subprocess.run(cmd, timeout=180, capture_output=True, text=True)
         if result.returncode != 0:
@@ -324,6 +328,17 @@ def main():
     print(f'=== 转录任务开始 {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} ===')
     print(f'配置: MAX_DURATION={MAX_DURATION_MIN}min, MAX_VIDEOS={MAX_VIDEOS_PER_RUN}')
 
+    # 写入 YouTube cookies 文件（供 yt-dlp 使用）
+    cookies_path = None
+    if YOUTUBE_COOKIES_B64:
+        import base64
+        cookies_path = os.path.join(tempfile.gettempdir(), 'youtube_cookies.txt')
+        with open(cookies_path, 'w') as f:
+            f.write(YOUTUBE_COOKIES_B64)
+        print(f'[cookies] 已写入: {cookies_path}')
+    else:
+        print('[cookies] 未配置 YOUTUBE_COOKIES，yt-dlp 可能被反爬拦截')
+
     bloggers = get_bloggers()
     transcribed_ids = get_transcribed_ids()
     processed = 0
@@ -384,7 +399,7 @@ def main():
 
                 # 下载音频
                 print(f'  下载音频...')
-                audio_path = download_audio(video_id, tmp_dir)
+                audio_path = download_audio(video_id, tmp_dir, cookies_path=cookies_path)
                 if not audio_path:
                     print(f'  下载失败，跳过')
                     continue
