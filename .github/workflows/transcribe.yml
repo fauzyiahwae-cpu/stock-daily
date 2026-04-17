@@ -3,7 +3,7 @@ name: 转录无字幕视频
 on:
   schedule:
     - cron: '0 0 * * 1-5'   # 北京时间 08:00，周一到周五（UTC 00:00）
-  workflow_dispatch:          # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   transcribe:
@@ -23,9 +23,10 @@ jobs:
         env:
           WORKER_URL:          ${{ secrets.WORKER_URL }}
           YOUTUBE_KEY:         ${{ secrets.YOUTUBE_KEY }}
-          GROQ_KEY:            ${{ secrets.GROQ_KEY }}      # Groq 免费 Whisper（主）
-          OPENAI_KEY:          ${{ secrets.OPENAI_KEY }}    # OpenAI fallback（可不填）
+          GROQ_KEY:            ${{ secrets.GROQ_KEY }}
+          OPENAI_KEY:          ${{ secrets.OPENAI_KEY }}
           SUPADATA_KEY:        ${{ secrets.SUPADATA_KEY }}
+          YOUTUBE_COOKIES:     ${{ secrets.YOUTUBE_COOKIES }}
           MAX_DURATION_MIN:    '30'
           MAX_VIDEOS_PER_RUN:  '3'
         run: python scripts/transcribe.py
