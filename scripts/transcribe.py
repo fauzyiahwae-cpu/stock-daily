@@ -30,17 +30,18 @@ MAX_VIDEOS_PER_RUN  = int(os.environ.get('MAX_VIDEOS_PER_RUN', '3'))
 WHISPER_SIZE_LIMIT_MB = 24  # Whisper API 硬限制 25MB，留1MB余量
 
 # ── HTTP 工具 ──────────────────────────────────────────────────
+DEFAULT_HEADERS = {'User-Agent': 'stock-daily-actions/1.0'}
+
 def http_get(url, headers=None):
-    req = urllib.request.Request(url, headers=headers or {})
+    h = {**DEFAULT_HEADERS, **(headers or {})}
+    req = urllib.request.Request(url, headers=h)
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.loads(r.read().decode())
 
 def http_post(url, data, headers=None):
     body = json.dumps(data).encode()
-    req = urllib.request.Request(url, data=body, headers={
-        'Content-Type': 'application/json',
-        **(headers or {})
-    })
+    h = {**DEFAULT_HEADERS, 'Content-Type': 'application/json', **(headers or {})}
+    req = urllib.request.Request(url, data=body, headers=h)
     with urllib.request.urlopen(req, timeout=60) as r:
         return json.loads(r.read().decode())
 
@@ -233,8 +234,7 @@ def download_audio(video_id, output_dir, cookies_path=None):
     output_tmpl = os.path.join(output_dir, f'{video_id}.%(ext)s')
     cmd = [
         'yt-dlp',
-        '--extract-audio',
-        '--audio-format', 'm4a',   # m4a 是 YouTube 原生格式，不需要转码，Whisper 支持
+        '-f', 'bestaudio',         # 直接下载最佳音频，不转码，避免格式问题
         '--no-playlist',
         '--output', output_tmpl,
         '--quiet',
