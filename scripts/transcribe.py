@@ -44,17 +44,23 @@ def http_post(url, data, headers=None):
 # ── 获取博主列表 ────────────────────────────────────────────────
 def get_bloggers():
     try:
-        d = http_get(f'{WORKER_URL}/api/config')
-        # /api/config 返回 { config: { symbols, bloggers } }
+        url = f'{WORKER_URL}/api/config'
+        print(f'[config] 请求: {url}')
+        req = urllib.request.Request(url, headers={'User-Agent': 'stock-daily-actions/1.0'})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            d = json.loads(r.read().decode())
         bloggers = d.get('config', {}).get('bloggers', [])
         if not bloggers:
-            # 兼容旧格式 { bloggers: [...] }
             bloggers = d.get('bloggers', [])
         print(f'[config] 博主数量: {len(bloggers)}')
         return bloggers
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()[:500]
+        print(f'[config] HTTP {e.code} 失败: {body}')
+        sys.exit(1)
     except Exception as e:
         print(f'[config] 失败: {e}')
-        sys.exit(1)  # 博主列表获取失败直接退出，不做无效工作
+        sys.exit(1)
 
 # ── 获取已存 KV 的转录 videoId（避免重复转录）──────────────────
 def get_transcribed_ids():
