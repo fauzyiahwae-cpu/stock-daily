@@ -30,4 +30,6 @@ jobs:
           YOUTUBE_COOKIES:     ${{ secrets.YOUTUBE_COOKIES }}
           MAX_DURATION_MIN:    '30'
           MAX_VIDEOS_PER_RUN:  '3'
-        run: python scripts/transcribe.py
+        run: |
+          find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+          python -B scripts/transcribe.py
