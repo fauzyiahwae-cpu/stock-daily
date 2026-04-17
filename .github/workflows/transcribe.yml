@@ -1,35 +1,34 @@
-name: 转录无字幕视频
+name: 无字幕视频转录
 
 on:
   schedule:
-    - cron: '0 0 * * 1-5'   # 北京时间 08:00，周一到周五（UTC 00:00）
-  workflow_dispatch:
+    # 北京时间 09:15 = UTC 01:15
+    - cron: '15 1 * * 1-5'
+    # 北京时间 21:00 = UTC 13:00
+    - cron: '0 13 * * 1-5'
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
   transcribe:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 安装依赖
-        run: |
-          sudo apt-get install -y ffmpeg
-          pip install --quiet yt-dlp
-          yt-dlp --version
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: 运行转录脚本
-        env:
-          WORKER_URL:          ${{ secrets.WORKER_URL }}
-          YOUTUBE_KEY:         ${{ secrets.YOUTUBE_KEY }}
-          GROQ_KEY:            ${{ secrets.GROQ_KEY }}
-          OPENAI_KEY:          ${{ secrets.OPENAI_KEY }}
-          SUPADATA_KEY:        ${{ secrets.SUPADATA_KEY }}
-          YOUTUBE_COOKIES:     ${{ secrets.YOUTUBE_COOKIES }}
-          MAX_DURATION_MIN:    '30'
-          MAX_VIDEOS_PER_RUN:  '3'
+      - name: Install dependencies
         run: |
-          find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-          python -B scripts/transcribe.py
+          pip install yt-dlp groq requests
+
+      - name: Run transcription
+        env:
+          WORKER_URL: https://stock-daily.fauzyiahwae.workers.dev
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          WORKER_SECRET: ${{ secrets.WORKER_SECRET }}
+        run: python scripts/transcribe.py
