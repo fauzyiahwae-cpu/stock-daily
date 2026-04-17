@@ -23,6 +23,8 @@ OPENAI_KEY          = os.environ.get('GROQ_KEY') or os.environ['OPENAI_KEY']  # 
 WHISPER_URL         = os.environ.get('WHISPER_URL', 'https://api.groq.com/openai/v1/audio/transcriptions')  # Groq 免费层，兼容 OpenAI 接口
 SUPADATA_KEY        = os.environ.get('SUPADATA_KEY', '')
 YOUTUBE_COOKIES_B64 = os.environ.get('YOUTUBE_COOKIES', '')  # base64 编码的 cookies.txt 内容
+
+
 MAX_DURATION_MIN    = int(os.environ.get('MAX_DURATION_MIN', '30'))
 MAX_VIDEOS_PER_RUN  = int(os.environ.get('MAX_VIDEOS_PER_RUN', '3'))
 WHISPER_SIZE_LIMIT_MB = 24  # Whisper API 硬限制 25MB，留1MB余量
@@ -62,6 +64,27 @@ def get_bloggers():
     except Exception as e:
         print(f'[config] 失败: {e}')
         sys.exit(1)
+
+# ── 从 KV 读取有字幕博主白名单 ─────────────────────────────────
+def get_caption_whitelist():
+    try:
+        d = http_get(f'{WORKER_URL}/api/transcript?caption_whitelist=1')
+        ids = set(d.get('channelIds', []))
+        print(f'[whitelist] 有字幕博主: {len(ids)} 个')
+        return ids
+    except Exception as e:
+        print(f'[whitelist] 读取失败（继续）: {e}')
+        return set()
+
+def add_to_caption_whitelist(channel_id):
+    try:
+        http_post(f'{WORKER_URL}/api/transcript', {
+            'action': 'add_caption_whitelist',
+            'channelId': channel_id
+        })
+        print(f'  [whitelist] 已记录有字幕博主: {channel_id}')
+    except Exception as e:
+        print(f'  [whitelist] 记录失败: {e}')
 
 # ── 获取已存 KV 的转录 videoId（避免重复转录）──────────────────
 def get_transcribed_ids():
@@ -340,6 +363,7 @@ def main():
 
     bloggers = get_bloggers()
     transcribed_ids = get_transcribed_ids()
+    caption_whitelist = get_caption_whitelist()
     processed = 0
 
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -355,6 +379,12 @@ def main():
                 continue
 
             print(f'\n--- {name} ({channel_id}) ---')
+
+            # 白名单博主直接跳过（已知有字幕，由前端 supadata 处理）
+            if channel_id in caption_whitelist:
+                print(f'  白名单博主（有字幕），跳过转录链路')
+                continue
+
             videos = get_today_videos(channel_id)
             if not videos:
                 print('  今日无视频')
@@ -379,6 +409,10 @@ def main():
                 print(f'  检查字幕...')
                 if has_caption(video_id):
                     print(f'  有字幕，跳过（前端 supadata 处理）')
+                    # 自动加入白名单，下次直接跳过该博主
+                    if channel_id not in caption_whitelist:
+                        add_to_caption_whitelist(channel_id)
+                        caption_whitelist.add(channel_id)
                     continue
 
                 # 获取时长
