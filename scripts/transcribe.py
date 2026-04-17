@@ -352,20 +352,23 @@ def main():
     print(f'配置: MAX_DURATION={MAX_DURATION_MIN}min, MAX_VIDEOS={MAX_VIDEOS_PER_RUN}')
 
     # 写入 YouTube cookies 文件（供 yt-dlp 使用）
+    # Secret 以 base64 编码存储，避免换行符丢失问题
     cookies_path = None
     if YOUTUBE_COOKIES_B64:
+        import base64
         cookies_path = os.path.join(tempfile.gettempdir(), 'youtube_cookies.txt')
-        # Secret 传入时换行符可能被转义为 \n，需要还原
-        cookies_content = YOUTUBE_COOKIES_B64.replace('\\n', '\n')
+        try:
+            # 尝试 base64 解码
+            cookies_bytes = base64.b64decode(YOUTUBE_COOKIES_B64)
+            cookies_content = cookies_bytes.decode('utf-8')
+        except Exception:
+            # 解码失败说明是纯文本，直接用（兼容旧格式）
+            cookies_content = YOUTUBE_COOKIES_B64.replace('\\n', '\n')
         with open(cookies_path, 'w', newline='\n') as f:
             f.write(cookies_content)
-        # 验证文件内容
-        with open(cookies_path, 'r') as f:
-            lines = f.readlines()
+        lines = cookies_content.strip().split('\n')
         print(f'[cookies] 已写入: {cookies_path} ({len(lines)} 行)')
-        # 打印前3行验证格式（不含敏感值）
-        for line in lines[:3]:
-            print(f'[cookies] 预览: {line[:60].strip()}')
+        print(f'[cookies] 首行: {lines[0][:50] if lines else "空"}')
     else:
         print('[cookies] 未配置 YOUTUBE_COOKIES，yt-dlp 可能被反爬拦截')
 
