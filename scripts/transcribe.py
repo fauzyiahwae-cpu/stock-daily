@@ -234,10 +234,9 @@ def download_audio(video_id, output_dir, cookies_path=None):
     output_tmpl = os.path.join(output_dir, f'{video_id}.%(ext)s')
     cmd = [
         'yt-dlp',
-        '-f', 'bestaudio',         # 直接下载最佳音频，不转码，避免格式问题
+        '-f', 'bestaudio/best',    # bestaudio 优先，fallback 到 best
         '--no-playlist',
         '--output', output_tmpl,
-        '--quiet',
         '--no-warnings',
         '--limit-rate', '2M',
         url
@@ -249,7 +248,9 @@ def download_audio(video_id, output_dir, cookies_path=None):
     try:
         result = subprocess.run(cmd, timeout=180, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f'  [yt-dlp] 失败(code={result.returncode}): {result.stderr[:300]}')
+            print(f'  [yt-dlp] 失败(code={result.returncode}):')
+            for line in result.stderr.strip().split('\n')[:10]:
+                print(f'    {line}')
             return None
 
         # 查找实际输出文件（扩展名可能变化）
