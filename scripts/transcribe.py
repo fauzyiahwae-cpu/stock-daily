@@ -211,8 +211,7 @@ def download_audio(video_id, output_dir, cookies_path=None):
     cmd = [
         'yt-dlp',
         '--extract-audio',
-        '--audio-format', 'mp3',
-        '--audio-quality', '5',
+        '--audio-format', 'm4a',   # m4a 是 YouTube 原生格式，不需要转码，Whisper 支持
         '--no-playlist',
         '--output', output_tmpl,
         '--quiet',
