@@ -149,12 +149,12 @@ def download_audio(video_id, tmpdir):
     yt_url = f'https://www.youtube.com/watch?v={video_id}'
     out_path = os.path.join(tmpdir, f'{video_id}.mp3')
 
-    # Step 1：请求 Cobalt 拿音频直链
+    # Step 1：请求 Cobalt 拿音频直链（v11 格式）
     print(f'  🎯 Cobalt 获取音频链接...')
     body = {
         'url': yt_url,
+        'downloadMode': 'audio',   # v11 字段名
         'audioFormat': 'mp3',
-        'isAudioOnly': True,
     }
     headers = {
         'Content-Type': 'application/json',
@@ -162,14 +162,20 @@ def download_audio(video_id, tmpdir):
     }
     try:
         data_bytes = json.dumps(body).encode()
+        cobalt_endpoint = COBALT_URL.rstrip('/') + '/'
+        print(f'  → POST {cobalt_endpoint}')
         req = urllib.request.Request(
-            f'{COBALT_URL}/',
+            cobalt_endpoint,
             data=data_bytes,
             headers=headers,
             method='POST'
         )
         with urllib.request.urlopen(req, timeout=60) as r:
             resp = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        body_err = e.read().decode()[:300]
+        print(f'  ❌ Cobalt HTTP {e.code}: {body_err}')
+        return None
     except Exception as e:
         print(f'  ❌ Cobalt 请求失败: {e}')
         return None
