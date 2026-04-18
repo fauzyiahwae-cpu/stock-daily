@@ -156,7 +156,7 @@ def download_audio(video_id, tmpdir):
 
     cmd = [
         'yt-dlp',
-        '--extractor-args', 'youtube:player_client=mweb,android',
+        '--extractor-args', 'youtube:player_client=tv_embedded',
         '--js-runtimes', f'node:{node_path}',
         '-x', '--audio-format', 'mp3',
         '--audio-quality', '5',
