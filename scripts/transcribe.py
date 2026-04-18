@@ -143,44 +143,71 @@ def try_supadata(video_id):
         pass
     return None
 
-# ── Step 3b：yt-dlp + bgutil po_token 插件下载音频 ───────────
+# ── Step 3b：Invidious API 获取音频直链 → 下载 ──────────────
+# 公开 Invidious 实例列表（轮换使用）
+INVIDIOUS_INSTANCES = [
+    'https://yewtu.be',
+    'https://inv.nadeko.net',
+    'https://invidious.privacyredirect.com',
+    'https://iv.datura.network',
+    'https://invidious.nerdvpn.de',
+]
+
 def download_audio(video_id, tmpdir):
-    yt_url = f'https://www.youtube.com/watch?v={video_id}'
+    import random, urllib.request
     out_path = os.path.join(tmpdir, f'{video_id}.mp3')
 
-    print(f'  🎯 yt-dlp 下载音频（bgutil po_token）...')
+    instances = random.sample(INVIDIOUS_INSTANCES, len(INVIDIOUS_INSTANCES))
+    for instance in instances:
+        try:
+            print(f'  🌐 Invidious: {instance}')
+            # 获取视频信息（含音频流 URL）
+            api_url = f'{instance}/api/v1/videos/{video_id}?fields=adaptiveFormats,formatStreams'
+            req = urllib.request.Request(api_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read().decode())
 
-    # 找 node 路径
-    import shutil
-    node_path = shutil.which('node') or '/usr/bin/node'
+            # 找音频流（只要音频，不要视频）
+            audio_url = None
+            best_bitrate = 0
+            for fmt in data.get('adaptiveFormats', []):
+                if fmt.get('type', '').startswith('audio/') and fmt.get('bitrate', 0) > best_bitrate:
+                    audio_url = fmt.get('url', '')
+                    best_bitrate = fmt.get('bitrate', 0)
 
-    cmd = [
-        'yt-dlp',
-        '--extractor-args', 'youtube:player_client=tv_embedded',
-        '--js-runtimes', f'node:{node_path}',
-        '-x', '--audio-format', 'mp3',
-        '--audio-quality', '5',
-        '--max-filesize', '50m',
-        '--no-playlist',
-        '--verbose',
-        '-o', out_path,
-        yt_url,
-    ]
-    try:
-        result = subprocess.run(cmd, timeout=180, capture_output=True, text=True)
-        if result.returncode == 0 and os.path.exists(out_path):
-            size_mb = os.path.getsize(out_path) / 1024 / 1024
+            if not audio_url:
+                # fallback 到普通流
+                streams = data.get('formatStreams', [])
+                if streams:
+                    audio_url = streams[-1].get('url', '')
+
+            if not audio_url:
+                print(f'  ❌ 未找到音频流')
+                continue
+
+            # 下载音频
+            print(f'  ⬇️ 下载音频...')
+            req2 = urllib.request.Request(audio_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req2, timeout=120) as r:
+                audio_data = r.read()
+
+            if len(audio_data) < 1000:
+                print(f'  ❌ 音频文件过小，跳过')
+                continue
+
+            with open(out_path, 'wb') as f:
+                f.write(audio_data)
+
+            size_mb = len(audio_data) / 1024 / 1024
             print(f'  ✅ 音频下载成功 ({size_mb:.1f} MB)')
             return out_path
-        else:
-            full_log = result.stdout + result.stderr
-            for line in full_log.splitlines():
-                if any(k in line for k in ['pot', 'POT', 'bgutil', 'ERROR', 'Sign in', 'login', 'Plugin', 'server_home']):
-                    print(f'  LOG: {line}')
-            return None
-    except subprocess.TimeoutExpired:
-        print('  ❌ yt-dlp 超时')
-        return None
+
+        except Exception as e:
+            print(f'  ❌ {instance} 失败: {e}')
+            continue
+
+    print('  ❌ 所有 Invidious 实例均失败')
+    return None
 
 # ── Step 4：Groq Whisper 转录 ─────────────────────────────────
 def transcribe_groq(audio_path):
