@@ -161,7 +161,7 @@ def download_audio(video_id, tmpdir):
         '--audio-quality', '5',
         '--max-filesize', '50m',
         '--no-playlist',
-        '--quiet',
+        '--verbose',   # 临时开启，看 pot providers
         '-o', out_path,
         yt_url,
     ]
@@ -172,7 +172,7 @@ def download_audio(video_id, tmpdir):
             print(f'  ✅ 音频下载成功 ({size_mb:.1f} MB)')
             return out_path
         else:
-            print(f'  ❌ yt-dlp 失败: {result.stderr[:300]}')
+            print(f'  ❌ yt-dlp 失败:\n{result.stderr[:1000]}')
             return None
     except subprocess.TimeoutExpired:
         print('  ❌ yt-dlp 超时')
