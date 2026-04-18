@@ -170,10 +170,13 @@ def download_audio(video_id, tmpdir):
         cmd = [
             'yt-dlp',
             '--proxy', proxy,
+            '--extractor-args', 'youtube:player_client=web_creator,web',
+            '--add-header', 'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             '-x', '--audio-format', 'mp3',
             '--audio-quality', '5',
             '--max-filesize', '50m',
             '--no-playlist',
+            '--retries', '3',
             '--quiet',
             '-o', out_path,
             yt_url,
