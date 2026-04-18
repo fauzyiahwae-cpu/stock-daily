@@ -18,7 +18,18 @@ jobs:
       - name: 安装依赖
         run: |
           pip install --quiet yt-dlp groq requests bgutil-ytdlp-pot-provider
-          npm install -g @ybd-project/ytdlp-nodejs 2>/dev/null || true
+          # 初始化 bgutil server 脚本（下载 JS 依赖）
+          python3 -c "
+          import subprocess, sys
+          result = subprocess.run(
+            ['python3', '-m', 'bgutil_ytdlp_pot_provider', '--setup'],
+            capture_output=True, text=True
+          )
+          print(result.stdout[:500])
+          print(result.stderr[:500])
+          " || true
+          node --version
+          which node
           yt-dlp --version
 
       - name: 运行转录脚本
