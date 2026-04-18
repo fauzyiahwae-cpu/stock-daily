@@ -148,9 +148,15 @@ def download_audio(video_id, tmpdir):
     out_path = os.path.join(tmpdir, f'{video_id}.mp3')
 
     print(f'  🎯 yt-dlp 下载音频（bgutil po_token）...')
+
+    # 找 node 路径
+    import shutil
+    node_path = shutil.which('node') or '/usr/bin/node'
+
     cmd = [
         'yt-dlp',
         '--extractor-args', 'youtube:player_client=web',
+        '--js-runtimes', f'node:{node_path}',
         '-x', '--audio-format', 'mp3',
         '--audio-quality', '5',
         '--max-filesize', '50m',
