@@ -18,19 +18,17 @@ jobs:
       - name: 安装依赖
         run: |
           pip install --quiet yt-dlp groq requests bgutil-ytdlp-pot-provider
-          # 把 bgutil 插件复制到 yt-dlp 插件目录
-          PLUGIN_DIR="$HOME/.local/lib/python3.12/site-packages/yt_dlp_plugins"
-          mkdir -p "$PLUGIN_DIR/extractor" "$PLUGIN_DIR/postprocessor"
-          BGUTIL_DIR=$(python3 -c "import bgutil_ytdlp_pot_provider; import os; print(os.path.dirname(bgutil_ytdlp_pot_provider.__file__))" 2>/dev/null || echo "")
-          if [ -n "$BGUTIL_DIR" ]; then
-            echo "bgutil 路径: $BGUTIL_DIR"
-            find "$BGUTIL_DIR" -name "*.py" | head -10
-          else
-            # pip 安装的插件包直接找
-            BGUTIL_DIR=$(pip show bgutil-ytdlp-pot-provider 2>/dev/null | grep Location | awk '{print $2}')
-            echo "pip location: $BGUTIL_DIR"
-            find "$BGUTIL_DIR" -path "*/yt_dlp_plugins*" -name "*.py" 2>/dev/null | head -10
-          fi
+          # 初始化 bgutil JS 脚本（必须先运行才能生成 po_token）
+          python3 -c "
+import subprocess, os
+result = subprocess.run(
+    ['node', os.path.expanduser('~/.local/lib/python3.12/site-packages/bgutil_ytdlp_pot_provider/server/build/generate_once.js'), '--help'],
+    capture_output=True, text=True
+)
+print('bgutil js:', result.stdout[:200], result.stderr[:200])
+" 2>/dev/null || true
+          # 用 yt-dlp 跑一次看 pot providers
+          yt-dlp --verbose --skip-download "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | grep -E "pot|POT|bgutil|JS runtime" || true
           node --version
           yt-dlp --version
 
