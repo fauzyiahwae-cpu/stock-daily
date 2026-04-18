@@ -18,17 +18,10 @@ jobs:
       - name: 安装依赖
         run: |
           pip install --quiet yt-dlp groq requests bgutil-ytdlp-pot-provider
-          # 初始化 bgutil JS 脚本（必须先运行才能生成 po_token）
-          python3 -c "
-import subprocess, os
-result = subprocess.run(
-    ['node', os.path.expanduser('~/.local/lib/python3.12/site-packages/bgutil_ytdlp_pot_provider/server/build/generate_once.js'), '--help'],
-    capture_output=True, text=True
-)
-print('bgutil js:', result.stdout[:200], result.stderr[:200])
-" 2>/dev/null || true
-          # 用 yt-dlp 跑一次看 pot providers
-          yt-dlp --verbose --skip-download "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | grep -E "pot|POT|bgutil|JS runtime" || true
+          # 验证 bgutil 插件位置
+          find ~/.local/lib -path "*/yt_dlp_plugins/extractor/getpot_bgutil*" 2>/dev/null || true
+          # 验证 yt-dlp 能识别 bgutil pot providers
+          yt-dlp --verbose --skip-download "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | grep -iE "pot|bgutil" || true
           node --version
           yt-dlp --version
 
