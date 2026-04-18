@@ -18,18 +18,9 @@ jobs:
       - name: 安装依赖
         run: |
           pip install --quiet yt-dlp groq requests bgutil-ytdlp-pot-provider
-          # 初始化 bgutil server 脚本（下载 JS 依赖）
-          python3 -c "
-          import subprocess, sys
-          result = subprocess.run(
-            ['python3', '-m', 'bgutil_ytdlp_pot_provider', '--setup'],
-            capture_output=True, text=True
-          )
-          print(result.stdout[:500])
-          print(result.stderr[:500])
-          " || true
+          # 用 yt-dlp 插件方式初始化 bgutil（下载 JS 脚本）
+          yt-dlp --verbose --skip-download "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | head -20 || true
           node --version
-          which node
           yt-dlp --version
 
       - name: 运行转录脚本
