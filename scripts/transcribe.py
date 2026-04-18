@@ -2,11 +2,10 @@
 """
 美股财经日报 - 无字幕视频转录脚本
 流程：
-  1. 从 Worker /api/analysis 拉今日博主视频列表
-  2. 从 Worker /api/cache 读已有缓存，跳过已分析的博主
-  3. 对无字幕的博主视频：supadata 先试一次，拿不到则 yt-dlp 下载音频
-  4. Groq Whisper 转录
-  5. 把转录文本写入 Cloudflare KV（key = transcript_{videoId}）
+  1. 直接调 YouTube API 拉今日博主视频列表（绕过 Worker，避免 Cloudflare 拦截）
+  2. 从 Worker /api/transcript?list=1 读已转录 ID，跳过已处理视频
+  3. 对无字幕视频：supadata 先试，拿不到则 yt-dlp 下载 → Groq Whisper 转录
+  4. 把转录文本写入 Cloudflare KV（key = transcript_{videoId}）
 """
 
 import os
@@ -17,16 +16,36 @@ import tempfile
 import subprocess
 import urllib.request
 import urllib.error
+import urllib.parse
 from datetime import datetime, timezone, timedelta
 
 # ── 配置 ──────────────────────────────────────────────────────
 WORKER_URL    = os.environ.get('WORKER_URL', 'https://stock-daily.fauzyiahwae.workers.dev')
 GROQ_API_KEY  = os.environ.get('GROQ_API_KEY', '')
-WORKER_SECRET = os.environ.get('WORKER_SECRET', '')  # 可选，用于 Worker 写入鉴权
+WORKER_SECRET = os.environ.get('WORKER_SECRET', '')
+YOUTUBE_KEY   = os.environ.get('YOUTUBE_KEY', '')
+SUPADATA_KEY  = os.environ.get('SUPADATA_KEY', 'sd_349fd0179c98859968af2d553a630e26')
+MAX_VIDEOS    = int(os.environ.get('MAX_VIDEOS_PER_RUN', '5'))
 
-SUPADATA_KEY  = 'sd_349fd0179c98859968af2d553a630e26'
+# ── 博主频道列表（channelId → 名称）──────────────────────────
+CHANNELS = {
+    'UCFQsi7WaF5X41tcuOryDk8w': '视野环球财经',
+    'UCFhJ8ZFg9W4kLwFTBBNIjOw': 'NaNa说美股',
+    'UCRBrH2qS7yKGMNSmjnj8gcw': '投资TALK君',
+    'UCZuj0RPlwgNf51xKKLeEjvw': 'Amy说美股',
+    'UC2I5em6UyBpQiO-8ZW0nV3w': '阳光财经',
+    'UCjuvy7VvwUGPtTnbpfYY1QQ': 'XTrader猫姐美股',
+    'UCemKtyVRsm-TcYqHQEZH5PQ': '股市咖啡屋',
+    'UCwyRBuGpaLYnFuohCYyjBeQ': 'Andy Lee',
+    'UCo2gxyermsLBSCxFHvJs0Zg': '老李玩钱',
+    'UCwq7HSc0E53LRTnsgpC--Og': 'Amy投资学堂',
+    'UCH60IM5V3OO2LrNIDueG26Q': '小左美股第一视角',
+    'UCveCI6CK6oPtuy24YH9ii9g': '牛顿师兄',
+    'UCzEMrrBM8FY_gWIXVexB92A': '财经企鹅姐',
+    'UCWgWYZjNo42YLvx6Arb6mcg': '美股Alpha姐',
+}
 
-# 北京时间今日日期（用于 KV key）
+# 北京时间今日日期
 def beijing_today():
     bj = datetime.now(timezone(timedelta(hours=8)))
     return bj.strftime('%Y-%m-%d')
@@ -38,7 +57,7 @@ def http_get(url, headers=None):
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read().decode())
     except Exception as e:
-        print(f'  GET 失败 {url}: {e}')
+        print(f'  GET 失败 {url[:80]}: {e}')
         return None
 
 def http_post(url, body, headers=None):
@@ -54,15 +73,53 @@ def http_post(url, body, headers=None):
         print(f'  POST 失败 {url}: {e}')
         return None
 
-# ── Step 1：拉今日视频列表 ──────────────────────────────────────
+# ── Step 1：直接调 YouTube API 拉今日视频 ─────────────────────
 def fetch_video_list():
-    print('📋 拉取今日博主视频列表...')
-    data = http_get(f'{WORKER_URL}/api/analysis')
-    if not data:
-        print('  ❌ 无法获取视频列表')
+    print('📋 直接调 YouTube API 拉取今日视频...')
+    if not YOUTUBE_KEY:
+        print('  ❌ 缺少 YOUTUBE_KEY')
         return []
-    channels = data.get('channels', [])
-    print(f'  获取到 {len(channels)} 个频道')
+
+    # 北京时间今天 00:00 转为 UTC ISO 格式（publishedAfter 过滤）
+    bj_now = datetime.now(timezone(timedelta(hours=8)))
+    bj_today_start = bj_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    published_after = bj_today_start.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    channels = []
+    for channel_id, name in CHANNELS.items():
+        # uploads playlist = UC... → UU...
+        playlist_id = 'UU' + channel_id[2:]
+        url = (
+            'https://www.googleapis.com/youtube/v3/playlistItems'
+            f'?part=snippet&playlistId={playlist_id}'
+            f'&maxResults=3&key={YOUTUBE_KEY}'
+        )
+        data = http_get(url)
+        if not data:
+            print(f'  ⚠️ {name} 获取失败')
+            channels.append({'channelId': channel_id, 'name': name, 'videos': []})
+            continue
+
+        items = data.get('items', [])
+        videos = []
+        for item in items:
+            snippet = item.get('snippet', {})
+            vid_id = snippet.get('resourceId', {}).get('videoId', '')
+            published = snippet.get('publishedAt', '')
+            # 只取今日发布的
+            if published >= published_after and vid_id:
+                videos.append({
+                    'videoId': vid_id,
+                    'title': snippet.get('title', ''),
+                    'publishedAt': published,
+                })
+
+        if videos:
+            print(f'  ✅ {name}: {len(videos)} 个今日视频')
+        channels.append({'channelId': channel_id, 'name': name, 'videos': videos})
+
+    total = sum(len(c['videos']) for c in channels)
+    print(f'  共找到 {total} 个今日视频')
     return channels
 
 # ── Step 2：读已有转录，找出需要处理的 ───────────────────────
@@ -183,16 +240,18 @@ def main():
     # 读已转录列表去重
     cached_ids = fetch_transcribed_ids()
 
-    # 筛选：有视频ID、且未缓存的频道
+    # 筛选：有今日视频、且未缓存的
     todo = []
     for ch in channels:
-        vid = ch.get('latestVideoId') or ch.get('videoId')
-        if not vid:
+        videos = ch.get('videos', [])
+        if not videos:
             continue
+        vid = videos[0]['videoId']
+        name = ch.get('name', '?')
         if vid in cached_ids:
-            print(f'  ⏭️  {ch.get("name","?")} 已缓存，跳过')
+            print(f'  ⏭️  {name} 已转录，跳过')
             continue
-        todo.append(ch)
+        todo.append({'name': name, 'videoId': vid, 'title': videos[0].get('title', '')})
 
     if not todo:
         print('\n✅ 所有频道均已处理，无需转录')
@@ -202,9 +261,9 @@ def main():
 
     success = 0
     with tempfile.TemporaryDirectory() as tmpdir:
-        for ch in todo:
-            name = ch.get('name', '未知')
-            vid  = ch.get('latestVideoId') or ch.get('videoId')
+        for ch in todo[:MAX_VIDEOS]:
+            name = ch['name']
+            vid  = ch['videoId']
             print(f'\n▶ {name} ({vid})')
 
             # 先试 supadata
