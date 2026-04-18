@@ -17,18 +17,8 @@ jobs:
 
       - name: 安装依赖
         run: |
-          pip install --quiet yt-dlp groq requests bgutil-ytdlp-pot-provider
-          # 克隆并构建 bgutil server JS 脚本
-          git clone --depth=1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git ~/bgutil-ytdlp-pot-provider
-          cd ~/bgutil-ytdlp-pot-provider/server
-          npm install --silent
-          npx tsc --outDir build 2>/dev/null || npm run build 2>/dev/null || true
-          ls build/ || true
-          cd -
-          # 验证
-          yt-dlp --verbose --skip-download "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | grep -iE "pot|bgutil" || true
-          node --version
-          yt-dlp --version
+          pip install --quiet groq requests
+          python3 --version
 
       - name: 运行转录脚本
         env:
