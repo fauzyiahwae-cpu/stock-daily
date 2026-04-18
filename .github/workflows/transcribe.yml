@@ -17,7 +17,8 @@ jobs:
 
       - name: 安装依赖
         run: |
-          pip install --quiet groq requests
+          pip install --quiet yt-dlp groq requests
+          yt-dlp --version
 
       - name: 运行转录脚本
         env:
@@ -26,7 +27,6 @@ jobs:
           SUPADATA_KEY:         ${{ secrets.SUPADATA_KEY }}
           WORKER_SECRET:        ${{ secrets.WORKER_SECRET }}
           YOUTUBE_KEY:          ${{ secrets.YOUTUBE_KEY }}
-          COBALT_URL:           https://cobalt-11-enht.onrender.com
           MAX_DURATION_MIN:     '30'
           MAX_VIDEOS_PER_RUN:   '5'
         run: python scripts/transcribe.py
