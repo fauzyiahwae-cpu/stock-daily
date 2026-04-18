@@ -142,40 +142,60 @@ def try_supadata(video_id):
         pass
     return None
 
-# ── Step 3b：yt-dlp 下载音频 ──────────────────────────────────
-def download_audio(video_id, tmpdir):
-    url = f'https://www.youtube.com/watch?v={video_id}'
-    out_path = os.path.join(tmpdir, f'{video_id}.mp3')
-    cmd = [
-        'yt-dlp',
-        '-x', '--audio-format', 'mp3',
-        '--audio-quality', '5',
-        '--max-filesize', '30m',
-        '--extractor-args', 'youtube:player_client=web',
-        '--no-playlist',
-        '--quiet',
-        '-o', out_path,
-        url
-    ]
-    # cookies 暂不使用（格式问题），先验证基础下载链路
-    # cookies = os.environ.get('YOUTUBE_COOKIES', '')
-    # if cookies:
-    #     cookie_file = os.path.join(tmpdir, 'cookies.txt')
-    #     with open(cookie_file, 'w') as f:
-    #         f.write(cookies)
-    #     cmd += ['--cookies', cookie_file]
+# ── Step 3b：Cobalt 获取音频 URL → 下载 ─────────────────────
+COBALT_URL = os.environ.get('COBALT_URL', 'https://cobalt-11-enht.onrender.com')
 
+def download_audio(video_id, tmpdir):
+    yt_url = f'https://www.youtube.com/watch?v={video_id}'
+    out_path = os.path.join(tmpdir, f'{video_id}.mp3')
+
+    # Step 1：请求 Cobalt 拿音频直链
+    print(f'  🎯 Cobalt 获取音频链接...')
+    body = {
+        'url': yt_url,
+        'audioFormat': 'mp3',
+        'isAudioOnly': True,
+    }
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }
     try:
-        result = subprocess.run(cmd, timeout=180, capture_output=True, text=True)
-        if result.returncode == 0 and os.path.exists(out_path):
-            size_mb = os.path.getsize(out_path) / 1024 / 1024
-            print(f'  ✅ 音频下载成功 ({size_mb:.1f} MB)')
-            return out_path
-        else:
-            print(f'  ❌ yt-dlp 失败: {result.stderr[:300]}')
-            return None
-    except subprocess.TimeoutExpired:
-        print('  ❌ yt-dlp 超时')
+        data_bytes = json.dumps(body).encode()
+        req = urllib.request.Request(
+            f'{COBALT_URL}/',
+            data=data_bytes,
+            headers=headers,
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=60) as r:
+            resp = json.loads(r.read().decode())
+    except Exception as e:
+        print(f'  ❌ Cobalt 请求失败: {e}')
+        return None
+
+    # Cobalt 返回 status: stream / redirect / tunnel
+    status = resp.get('status')
+    audio_url = resp.get('url')
+
+    if status == 'error' or not audio_url:
+        print(f'  ❌ Cobalt 返回错误: {resp.get("error", resp)}')
+        return None
+
+    print(f'  ✅ Cobalt 音频链接获取成功 (status={status})')
+
+    # Step 2：下载音频文件
+    try:
+        req2 = urllib.request.Request(audio_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req2, timeout=120) as r:
+            audio_data = r.read()
+        with open(out_path, 'wb') as f:
+            f.write(audio_data)
+        size_mb = len(audio_data) / 1024 / 1024
+        print(f'  ✅ 音频下载成功 ({size_mb:.1f} MB)')
+        return out_path
+    except Exception as e:
+        print(f'  ❌ 音频下载失败: {e}')
         return None
 
 # ── Step 4：Groq Whisper 转录 ─────────────────────────────────
