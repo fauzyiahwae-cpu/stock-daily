@@ -26,6 +26,7 @@ jobs:
           GROQ_API_KEY:         ${{ secrets.GROQ_KEY }}
           SUPADATA_KEY:         ${{ secrets.SUPADATA_KEY }}
           WORKER_SECRET:        ${{ secrets.WORKER_SECRET }}
+          YOUTUBE_KEY:          ${{ secrets.YOUTUBE_KEY }}
           YOUTUBE_COOKIES:      ${{ secrets.YOUTUBE_COOKIES }}
           MAX_DURATION_MIN:     '30'
           MAX_VIDEOS_PER_RUN:   '5'
