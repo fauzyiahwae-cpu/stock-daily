@@ -80,10 +80,11 @@ def fetch_video_list():
         print('  ❌ 缺少 YOUTUBE_KEY')
         return []
 
-    # 北京时间今天 00:00 转为 UTC ISO 格式（publishedAfter 过滤）
+    # 北京时间今天 00:00 往前推2天，扩大时间窗口
     bj_now = datetime.now(timezone(timedelta(hours=8)))
-    bj_today_start = bj_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    published_after = bj_today_start.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    bj_2days_ago = bj_now - timedelta(days=2)
+    bj_window_start = bj_2days_ago.replace(hour=0, minute=0, second=0, microsecond=0)
+    published_after = bj_window_start.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     channels = []
     for channel_id, name in CHANNELS.items():
