@@ -142,61 +142,35 @@ def try_supadata(video_id):
         pass
     return None
 
-# ── Step 3b：yt-dlp + Webshare 住宅代理下载音频 ──────────────
-# Webshare 免费代理列表（自动轮换）
-PROXIES = [
-    'http://lgpmhapx:c0ugt815uf3f@31.59.20.176:6754',
-    'http://lgpmhapx:c0ugt815uf3f@198.23.239.134:6540',
-    'http://lgpmhapx:c0ugt815uf3f@45.38.107.97:6014',
-    'http://lgpmhapx:c0ugt815uf3f@107.172.163.27:6543',
-    'http://lgpmhapx:c0ugt815uf3f@198.105.121.200:6462',
-    'http://lgpmhapx:c0ugt815uf3f@216.10.27.159:6837',
-    'http://lgpmhapx:c0ugt815uf3f@142.111.67.146:5611',
-    'http://lgpmhapx:c0ugt815uf3f@191.96.254.138:6185',
-    'http://lgpmhapx:c0ugt815uf3f@31.58.9.4:6077',
-    'http://lgpmhapx:c0ugt815uf3f@23.26.71.145:5628',
-]
-
+# ── Step 3b：yt-dlp + bgutil po_token 插件下载音频 ───────────
 def download_audio(video_id, tmpdir):
-    import random
     yt_url = f'https://www.youtube.com/watch?v={video_id}'
     out_path = os.path.join(tmpdir, f'{video_id}.mp3')
 
-    # 随机选一个代理，失败则换下一个
-    proxies = random.sample(PROXIES, len(PROXIES))
-    for proxy in proxies[:3]:  # 最多试3个
-        ip_port = proxy.split('@')[1]
-        print(f'  🌐 尝试代理 {ip_port}...')
-        cmd = [
-            'yt-dlp',
-            '--proxy', proxy,
-            '--extractor-args', 'youtube:player_client=web_creator,web',
-            '--add-header', 'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            '-x', '--audio-format', 'mp3',
-            '--audio-quality', '5',
-            '--max-filesize', '50m',
-            '--no-playlist',
-            '--retries', '3',
-            '--quiet',
-            '-o', out_path,
-            yt_url,
-        ]
-        try:
-            result = subprocess.run(cmd, timeout=180, capture_output=True, text=True)
-            if result.returncode == 0 and os.path.exists(out_path):
-                size_mb = os.path.getsize(out_path) / 1024 / 1024
-                print(f'  ✅ 音频下载成功 ({size_mb:.1f} MB)')
-                return out_path
-            else:
-                err = result.stderr[:200]
-                print(f'  ❌ 失败: {err}')
-        except subprocess.TimeoutExpired:
-            print(f'  ❌ 超时')
-        # 换下一个代理前稍等
-        time.sleep(2)
-
-    print(f'  ❌ 所有代理均失败')
-    return None
+    print(f'  🎯 yt-dlp 下载音频（bgutil po_token）...')
+    cmd = [
+        'yt-dlp',
+        '--extractor-args', 'youtube:player_client=web',
+        '-x', '--audio-format', 'mp3',
+        '--audio-quality', '5',
+        '--max-filesize', '50m',
+        '--no-playlist',
+        '--quiet',
+        '-o', out_path,
+        yt_url,
+    ]
+    try:
+        result = subprocess.run(cmd, timeout=180, capture_output=True, text=True)
+        if result.returncode == 0 and os.path.exists(out_path):
+            size_mb = os.path.getsize(out_path) / 1024 / 1024
+            print(f'  ✅ 音频下载成功 ({size_mb:.1f} MB)')
+            return out_path
+        else:
+            print(f'  ❌ yt-dlp 失败: {result.stderr[:300]}')
+            return None
+    except subprocess.TimeoutExpired:
+        print('  ❌ yt-dlp 超时')
+        return None
 
 # ── Step 4：Groq Whisper 转录 ─────────────────────────────────
 def transcribe_groq(audio_path):
