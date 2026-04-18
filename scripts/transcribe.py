@@ -173,7 +173,10 @@ def download_audio(video_id, tmpdir):
             print(f'  ✅ 音频下载成功 ({size_mb:.1f} MB)')
             return out_path
         else:
-            print(f'  ❌ yt-dlp 失败:\n{result.stderr[:1000]}')
+            full_log = result.stdout + result.stderr
+            for line in full_log.splitlines():
+                if any(k in line for k in ['pot', 'POT', 'bgutil', 'ERROR', 'Sign in', 'login', 'Plugin', 'server_home']):
+                    print(f'  LOG: {line}')
             return None
     except subprocess.TimeoutExpired:
         print('  ❌ yt-dlp 超时')
