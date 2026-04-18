@@ -17,9 +17,9 @@ jobs:
 
       - name: 安装依赖
         run: |
-          pip install --quiet yt-dlp groq requests
+          pip install --quiet yt-dlp groq requests bgutil-ytdlp-pot-provider
+          npm install -g @ybd-project/ytdlp-nodejs 2>/dev/null || true
           yt-dlp --version
-          node --version
 
       - name: 运行转录脚本
         env:
