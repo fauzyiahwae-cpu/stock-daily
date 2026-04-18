@@ -142,67 +142,58 @@ def try_supadata(video_id):
         pass
     return None
 
-# ── Step 3b：Cobalt 获取音频 URL → 下载 ─────────────────────
-COBALT_URL = os.environ.get('COBALT_URL', 'https://cobalt-11-enht.onrender.com')
+# ── Step 3b：yt-dlp + Webshare 住宅代理下载音频 ──────────────
+# Webshare 免费代理列表（自动轮换）
+PROXIES = [
+    'http://lgpmhapx:c0ugt815uf3f@31.59.20.176:6754',
+    'http://lgpmhapx:c0ugt815uf3f@198.23.239.134:6540',
+    'http://lgpmhapx:c0ugt815uf3f@45.38.107.97:6014',
+    'http://lgpmhapx:c0ugt815uf3f@107.172.163.27:6543',
+    'http://lgpmhapx:c0ugt815uf3f@198.105.121.200:6462',
+    'http://lgpmhapx:c0ugt815uf3f@216.10.27.159:6837',
+    'http://lgpmhapx:c0ugt815uf3f@142.111.67.146:5611',
+    'http://lgpmhapx:c0ugt815uf3f@191.96.254.138:6185',
+    'http://lgpmhapx:c0ugt815uf3f@31.58.9.4:6077',
+    'http://lgpmhapx:c0ugt815uf3f@23.26.71.145:5628',
+]
 
 def download_audio(video_id, tmpdir):
+    import random
     yt_url = f'https://www.youtube.com/watch?v={video_id}'
     out_path = os.path.join(tmpdir, f'{video_id}.mp3')
 
-    # Step 1：请求 Cobalt 拿音频直链（v11 格式）
-    print(f'  🎯 Cobalt 获取音频链接...')
-    body = {
-        'url': yt_url,
-        'downloadMode': 'audio',   # v11 字段名
-        'audioFormat': 'mp3',
-    }
-    headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-    }
-    try:
-        data_bytes = json.dumps(body).encode()
-        cobalt_endpoint = COBALT_URL.rstrip('/') + '/'
-        print(f'  → POST {cobalt_endpoint}')
-        req = urllib.request.Request(
-            cobalt_endpoint,
-            data=data_bytes,
-            headers=headers,
-            method='POST'
-        )
-        with urllib.request.urlopen(req, timeout=60) as r:
-            resp = json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        body_err = e.read().decode()[:300]
-        print(f'  ❌ Cobalt HTTP {e.code}: {body_err}')
-        return None
-    except Exception as e:
-        print(f'  ❌ Cobalt 请求失败: {e}')
-        return None
+    # 随机选一个代理，失败则换下一个
+    proxies = random.sample(PROXIES, len(PROXIES))
+    for proxy in proxies[:3]:  # 最多试3个
+        ip_port = proxy.split('@')[1]
+        print(f'  🌐 尝试代理 {ip_port}...')
+        cmd = [
+            'yt-dlp',
+            '--proxy', proxy,
+            '-x', '--audio-format', 'mp3',
+            '--audio-quality', '5',
+            '--max-filesize', '50m',
+            '--no-playlist',
+            '--quiet',
+            '-o', out_path,
+            yt_url,
+        ]
+        try:
+            result = subprocess.run(cmd, timeout=180, capture_output=True, text=True)
+            if result.returncode == 0 and os.path.exists(out_path):
+                size_mb = os.path.getsize(out_path) / 1024 / 1024
+                print(f'  ✅ 音频下载成功 ({size_mb:.1f} MB)')
+                return out_path
+            else:
+                err = result.stderr[:200]
+                print(f'  ❌ 失败: {err}')
+        except subprocess.TimeoutExpired:
+            print(f'  ❌ 超时')
+        # 换下一个代理前稍等
+        time.sleep(2)
 
-    # Cobalt 返回 status: stream / redirect / tunnel
-    status = resp.get('status')
-    audio_url = resp.get('url')
-
-    if status == 'error' or not audio_url:
-        print(f'  ❌ Cobalt 返回错误: {resp.get("error", resp)}')
-        return None
-
-    print(f'  ✅ Cobalt 音频链接获取成功 (status={status})')
-
-    # Step 2：下载音频文件
-    try:
-        req2 = urllib.request.Request(audio_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req2, timeout=120) as r:
-            audio_data = r.read()
-        with open(out_path, 'wb') as f:
-            f.write(audio_data)
-        size_mb = len(audio_data) / 1024 / 1024
-        print(f'  ✅ 音频下载成功 ({size_mb:.1f} MB)')
-        return out_path
-    except Exception as e:
-        print(f'  ❌ 音频下载失败: {e}')
-        return None
+    print(f'  ❌ 所有代理均失败')
+    return None
 
 # ── Step 4：Groq Whisper 转录 ─────────────────────────────────
 def transcribe_groq(audio_path):
