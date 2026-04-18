@@ -156,12 +156,13 @@ def download_audio(video_id, tmpdir):
     cmd = [
         'yt-dlp',
         '--extractor-args', 'youtube:player_client=web',
+        '--extractor-args', 'youtubepot-bgutilscript:server_home=/home/runner/bgutil-ytdlp-pot-provider/server',
         '--js-runtimes', f'node:{node_path}',
         '-x', '--audio-format', 'mp3',
         '--audio-quality', '5',
         '--max-filesize', '50m',
         '--no-playlist',
-        '--verbose',   # 临时开启，看 pot providers
+        '--verbose',
         '-o', out_path,
         yt_url,
     ]
