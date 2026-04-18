@@ -122,14 +122,9 @@ def fetch_video_list():
     print(f'  共找到 {total} 个今日视频')
     return channels
 
-# ── Step 2：读已有转录，找出需要处理的 ───────────────────────
+# ── Step 2：已转录 ID（本次运行内存去重，不依赖 Worker）────────
 def fetch_transcribed_ids():
-    # 从 /api/transcript?list=1 拿已转录的 videoId 列表
-    data = http_get(f'{WORKER_URL}/api/transcript?list=1')
-    if data and isinstance(data.get('videoIds'), list):
-        ids = set(data['videoIds'])
-        print(f'  已转录 {len(ids)} 个视频')
-        return ids
+    # Cloudflare 会拦截 Actions IP，改为内存去重（同一次运行不重复处理）
     return set()
 
 # ── Step 3a：supadata 试抓字幕 ────────────────────────────────
@@ -154,21 +149,30 @@ def download_audio(video_id, tmpdir):
     cmd = [
         'yt-dlp',
         '-x', '--audio-format', 'mp3',
-        '--audio-quality', '5',          # 中等质量，减小文件体积
-        '--max-filesize', '30m',          # 最大 30MB（约 30 分钟音频）
-        '-o', out_path,
+        '--audio-quality', '5',
+        '--max-filesize', '30m',
+        '--extractor-args', 'youtube:player_client=web',
         '--no-playlist',
         '--quiet',
+        '-o', out_path,
         url
     ]
+    # 如果有 cookies（应对年龄限制/登录墙）
+    cookies = os.environ.get('YOUTUBE_COOKIES', '')
+    if cookies:
+        cookie_file = os.path.join(tmpdir, 'cookies.txt')
+        with open(cookie_file, 'w') as f:
+            f.write(cookies)
+        cmd += ['--cookies', cookie_file]
+
     try:
-        result = subprocess.run(cmd, timeout=120, capture_output=True, text=True)
+        result = subprocess.run(cmd, timeout=180, capture_output=True, text=True)
         if result.returncode == 0 and os.path.exists(out_path):
             size_mb = os.path.getsize(out_path) / 1024 / 1024
             print(f'  ✅ 音频下载成功 ({size_mb:.1f} MB)')
             return out_path
         else:
-            print(f'  ❌ yt-dlp 失败: {result.stderr[:200]}')
+            print(f'  ❌ yt-dlp 失败: {result.stderr[:300]}')
             return None
     except subprocess.TimeoutExpired:
         print('  ❌ yt-dlp 超时')
