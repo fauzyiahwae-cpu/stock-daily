@@ -157,13 +157,13 @@ def download_audio(video_id, tmpdir):
         '-o', out_path,
         url
     ]
-    # 如果有 cookies（应对年龄限制/登录墙）
-    cookies = os.environ.get('YOUTUBE_COOKIES', '')
-    if cookies:
-        cookie_file = os.path.join(tmpdir, 'cookies.txt')
-        with open(cookie_file, 'w') as f:
-            f.write(cookies)
-        cmd += ['--cookies', cookie_file]
+    # cookies 暂不使用（格式问题），先验证基础下载链路
+    # cookies = os.environ.get('YOUTUBE_COOKIES', '')
+    # if cookies:
+    #     cookie_file = os.path.join(tmpdir, 'cookies.txt')
+    #     with open(cookie_file, 'w') as f:
+    #         f.write(cookies)
+    #     cmd += ['--cookies', cookie_file]
 
     try:
         result = subprocess.run(cmd, timeout=180, capture_output=True, text=True)
